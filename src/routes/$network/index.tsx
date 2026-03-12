@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { type ColumnDef } from "@tanstack/react-table";
 import { getNetworkBySlug } from "~/lib/config/networks";
-import { querySubgraph, querySubgraphAll, subgraphKeys } from "~/lib/subgraph/client";
+import { querySubgraph, subgraphKeys } from "~/lib/subgraph/client";
 import type { Stream } from "~/lib/subgraph/types";
 import { StatCard } from "~/components/stat-card";
 import { DataTable } from "~/components/data-table";
@@ -69,14 +69,24 @@ interface NetworkAggregateCounts {
 }
 
 async function getNetworkStats(network: string): Promise<NetworkAggregateCounts> {
-  const stats = await querySubgraphAll<{
-    id: string;
-    totalNumberOfActiveStreams: number;
-    totalNumberOfActivePools: number;
-  }>(network, "tokenStatistics", "id totalNumberOfActiveStreams totalNumberOfActivePools");
+  const query = `{
+    tokenStatistics(first: 1000, where: { token_: { isListed: true } }) {
+      id
+      totalNumberOfActiveStreams
+      totalNumberOfActivePools
+    }
+  }`;
+
+  const data = await querySubgraph<{
+    tokenStatistics: Array<{
+      id: string;
+      totalNumberOfActiveStreams: number;
+      totalNumberOfActivePools: number;
+    }>;
+  }>(network, query);
 
   const counts: NetworkAggregateCounts = { totalActiveStreams: 0, totalActivePools: 0 };
-  for (const stat of stats) {
+  for (const stat of data.tokenStatistics) {
     counts.totalActiveStreams += stat.totalNumberOfActiveStreams;
     counts.totalActivePools += stat.totalNumberOfActivePools;
   }
@@ -84,10 +94,12 @@ async function getNetworkStats(network: string): Promise<NetworkAggregateCounts>
 }
 
 async function getListedTokenCount(network: string): Promise<number> {
-  const tokens = await querySubgraphAll<{ id: string }>(
-    network, "tokens", "id", "isListed: true"
-  );
-  return tokens.length;
+  const query = `{
+    tokens(first: 1000, where: { isListed: true }) { id }
+  }`;
+
+  const data = await querySubgraph<{ tokens: Array<{ id: string }> }>(network, query);
+  return data.tokens.length;
 }
 
 async function getLatestStreams(network: string) {
@@ -222,12 +234,12 @@ function NetworkHome() {
         <StatCard
           title="Active Streams"
           value={statsLoading ? "..." : totalActiveStreams.toLocaleString()}
-          description="Total number of active streams across all tokens"
+          description="Active streams across listed tokens"
         />
         <StatCard
           title="Active Pools"
           value={statsLoading ? "..." : totalActivePools.toLocaleString()}
-          description="Total number of active distribution pools"
+          description="Active pools across listed tokens"
         />
         <StatCard
           title="Listed Super Tokens"
