@@ -20,11 +20,7 @@ const searchSchema = z.object({
   sort: z.string().default("activeStreams").catch("activeStreams"),
   dir: z.enum(["asc", "desc"]).default("desc").catch("desc"),
   search: z.string().default("").catch(""),
-  listed: z
-    .enum(["true", "false"])
-    .default("true")
-    .catch("true")
-    .transform((v) => v === "true"),
+  listed: z.enum(["true", "false"]).default("true").catch("true"),
 });
 
 export const Route = createFileRoute("/$network/supertokens/")({
@@ -64,13 +60,13 @@ async function getTokenStats(
   sort: string,
   dir: "asc" | "desc",
   search: string,
-  listed: boolean
+  listed: string
 ): Promise<TokenWithStats[]> {
   const skip = (page - 1) * pageSize;
   const orderBy = SORT_FIELD_MAP[sort] || "totalNumberOfActiveStreams";
 
   const tokenFilters: string[] = ["isSuperToken: true"];
-  if (listed) tokenFilters.push("isListed: true");
+  if (listed === "true") tokenFilters.push("isListed: true");
   if (search) tokenFilters.push(`symbol_contains_nocase: "${search}"`);
   const tokenWhere = tokenFilters.join(", ");
 
@@ -243,7 +239,7 @@ function SuperTokensListing() {
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <input
             type="checkbox"
-            checked={listed}
+            checked={listed === "true"}
             onChange={(e) => {
               navigate({
                 search: (prev: Record<string, unknown>) => ({
